@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -243,7 +244,8 @@ internal class LocalPlugin : IAsyncDisposable
         var ioc = await Service<ServiceContainer>.GetAsync();
         var pluginManager = await Service<PluginManager>.GetAsync();
         var dalamud = await Service<Dalamud>.GetAsync();
-
+        var pluginMetric = await Service<PluginMetricsHandler>.GetAsync();
+        var watch = Stopwatch.StartNew();
         if (this.manifest.LoadRequiredState == 0)
             _ = await Service<InterfaceManager.InterfaceManagerWithScene>.GetAsync();
 
@@ -394,7 +396,8 @@ internal class LocalPlugin : IAsyncDisposable
                                     this.pluginType!,
                                     this.dalamudInterface);
                 this.State = PluginState.Loaded;
-                Log.Information("Finished loading {PluginName}", this.InternalName);
+                watch.Stop();
+                Log.Information("Finished loading {PluginName} in {LoadTime} ms", this.InternalName,watch.ElapsedMilliseconds);
             }
             catch (Exception ex)
             {
@@ -422,6 +425,8 @@ internal class LocalPlugin : IAsyncDisposable
         }
         finally
         {
+            watch.Stop();
+            pluginMetric.RecordStartupTime(watch.ElapsedMilliseconds);
             this.pluginLoadStateLock.Release();
         }
     }
